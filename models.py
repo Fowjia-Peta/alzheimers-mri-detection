@@ -1,69 +1,76 @@
-"""Four model definitions used in the project: Modified CNN, VGG16, AlexNet-style, MobileNet."""
+"""Model builders: custom CNN, VGG16 and MobileNetV2 (transfer learning)."""
+import tensorflow as tf
 from tensorflow.keras import layers, models
-from tensorflow.keras.applications import VGG16, MobileNet
 
 IMG_SIZE = (128, 128)
 INPUT_SHAPE = IMG_SIZE + (3,)
-NUM_CLASSES = 4   # Non Demented, Very Mild, Mild, Moderate
+NUM_CLASSES = 4
+MODEL_FILES = {
+    "cnn": "cnn.keras",
+    "vgg16": "vgg16.keras",
+    "mobilenetv2": "mobilenetv2.keras",
+}
+MODEL_LABELS = {
+    "cnn": "Custom CNN",
+    "vgg16": "VGG16",
+    "mobilenetv2": "MobileNetV2",
+}
 
 
-def modified_cnn():
+@tf.keras.utils.register_keras_serializable(package="alz")
+class VGGPreprocess(layers.Layer):
+    """VGG16 preprocessing (RGB->BGR, subtract ImageNet mean) as a saveable layer."""
+
+    def call(self, x):
+        return tf.keras.applications.vgg16.preprocess_input(x)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+
+def build_cnn():
     return models.Sequential([
-        layers.Input(INPUT_SHAPE),
-        layers.Rescaling(1./255),
-        layers.Conv2D(32, 3, activation="relu"), layers.MaxPooling2D(),
-        layers.Conv2D(64, 3, activation="relu"), layers.MaxPooling2D(),
-        layers.Conv2D(128, 3, activation="relu"), layers.MaxPooling2D(),
-        layers.Dropout(0.3),
+        layers.Input(shape=INPUT_SHAPE),
+        layers.Rescaling(1.0 / 255),
+        layers.Conv2D(32, 3, activation="relu"),
+        layers.MaxPooling2D(),
+        layers.Conv2D(64, 3, activation="relu"),
+        layers.MaxPooling2D(),
+        layers.Conv2D(128, 3, activation="relu"),
+        layers.MaxPooling2D(),
         layers.Flatten(),
         layers.Dense(128, activation="relu"),
         layers.Dropout(0.3),
         layers.Dense(NUM_CLASSES, activation="softmax"),
-    ], name="modified_cnn")
+    ], name="cnn")
 
 
-def alexnet():
-    """Smaller AlexNet-style network (5 conv layers + 3 dense layers)."""
-    return models.Sequential([
-        layers.Input(INPUT_SHAPE),
-        layers.Rescaling(1./255),
-        layers.Conv2D(96, 11, strides=4, activation="relu"), layers.MaxPooling2D(3, strides=2),
-        layers.Conv2D(256, 5, padding="same", activation="relu"), layers.MaxPooling2D(3, strides=2),
-        layers.Conv2D(384, 3, padding="same", activation="relu"),
-        layers.Conv2D(384, 3, padding="same", activation="relu"),
-        layers.Conv2D(256, 3, padding="same", activation="relu"), layers.MaxPooling2D(2),
-        layers.Flatten(),
-        layers.Dense(512, activation="relu"), layers.Dropout(0.5),
-        layers.Dense(256, activation="relu"), layers.Dropout(0.5),
-        layers.Dense(NUM_CLASSES, activation="softmax"),
-    ], name="alexnet")
-
-
-def _transfer(base_cls, name):
-    base = base_cls(include_top=False, weights="imagenet", input_shape=INPUT_SHAPE)
-    base.trainable = False   # transfer learning: freeze pre-trained layers
-    return models.Sequential([
-        layers.Input(INPUT_SHAPE),
-        layers.Rescaling(1./255),
+def build_vgg16():
+    base = tf.keras.applications.VGG16(
+        input_shape=INPUT_SHAPE, include_top=False, weights="imagenet")
+    base.trainable = False
+    model = models.Sequential([
+        layers.Input(shape=INPUT_SHAPE),
+        VGGPreprocess(),
         base,
         layers.GlobalAveragePooling2D(),
         layers.Dense(128, activation="relu"),
         layers.Dropout(0.3),
         layers.Dense(NUM_CLASSES, activation="softmax"),
-    ], name=name)
+    ], name="vgg16")
+    return model, base
 
 
-def vgg16():
-    return _transfer(VGG16, "vgg16")
-
-
-def mobilenet():
-    return _transfer(MobileNet, "mobilenet")
-
-
-MODEL_BUILDERS = {
-    "modified_cnn": modified_cnn,
-    "vgg16": vgg16,
-    "alexnet": alexnet,
-    "mobilenet": mobilenet,
-}
+def build_mobilenetv2():
+    base = tf.keras.applications.MobileNetV2(
+        input_shape=INPUT_SHAPE, include_top=False, weights="imagenet")
+    base.trainable = False
+    model = models.Sequential([
+        layers.Input(shape=INPUT_SHAPE),
+        layers.Rescaling(1.0 / 127.5, offset=-1),
+        base,
+        layers.GlobalAveragePooling2D(),
+        layers.Dropout(0.3),
+        layers.Dense(NUM_CLASSES, activation="softmax"),
+    ], name="mobilenetv2")
+    return model, base

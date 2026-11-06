@@ -1,5 +1,5 @@
-tensorflow
+tensorflow>=2.16
+flask>=3.0
 numpy
 pillow
-flask
-matplotlib
+scikit-learn

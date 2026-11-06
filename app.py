@@ -1,35 +1,58 @@
-"""Flask app: upload an MRI image, pick an algorithm, see the predicted class."""
-import io, json, os
+"""Flask app: upload an MRI image, choose a model and see the predicted class."""
+import io
+import json
+import os
+
 import numpy as np
+import tensorflow as tf
 from flask import Flask, render_template, request
 from PIL import Image
-from tensorflow.keras.models import load_model
-from models import IMG_SIZE, MODEL_BUILDERS
+
+import models  # registers the custom VGG preprocessing layer
 
 app = Flask(__name__)
-CLASS_NAMES = json.load(open("saved_models/class_names.json"))
+MODEL_DIR = "saved_models"
 _cache = {}
 
-def get_model(name):
-    if name not in _cache:
-        _cache[name] = load_model(f"saved_models/{name}.keras")
-    return _cache[name]
+
+def class_names():
+    with open(os.path.join(MODEL_DIR, "class_names.json")) as f:
+        return json.load(f)
+
+
+def get_model(key):
+    if key not in _cache:
+        path = os.path.join(MODEL_DIR, models.MODEL_FILES[key])
+        _cache[key] = tf.keras.models.load_model(path)
+    return _cache[key]
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    result = error = None
+    result, error = None, None
     if request.method == "POST":
+        key = request.form.get("algorithm", "cnn")
         file = request.files.get("image")
-        algo = request.form.get("algorithm")
-        if not file or algo not in MODEL_BUILDERS:
-            error = "Please choose an image and an algorithm."
+        if key not in models.MODEL_FILES:
+            error = "Please choose a valid algorithm."
+        elif not file or file.filename == "":
+            error = "Please upload an MRI image."
         else:
-            img = Image.open(io.BytesIO(file.read())).convert("RGB").resize(IMG_SIZE)
-            x = np.expand_dims(np.array(img, dtype="float32"), 0)
-            probs = get_model(algo).predict(x, verbose=0)[0]
-            i = int(np.argmax(probs))
-            result = {"label": CLASS_NAMES[i], "confidence": f"{probs[i]:.1%}", "algo": algo}
-    return render_template("index.html", algorithms=list(MODEL_BUILDERS), result=result, error=error)
+            try:
+                img = Image.open(io.BytesIO(file.read())).convert("RGB").resize(models.IMG_SIZE)
+                x = np.expand_dims(np.array(img, dtype="float32"), 0)
+                probs = get_model(key).predict(x, verbose=0)[0]
+                names = class_names()
+                idx = int(np.argmax(probs))
+                result = {
+                    "label": names[idx],
+                    "confidence": f"{probs[idx] * 100:.1f}",
+                    "model": models.MODEL_LABELS[key],
+                }
+            except Exception as exc:  # unreadable image or missing saved model
+                error = f"Could not run prediction: {exc}"
+    return render_template("index.html", labels=models.MODEL_LABELS, result=result, error=error)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
