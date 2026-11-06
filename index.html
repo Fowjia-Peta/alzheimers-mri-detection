@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Alzheimer's MRI Detection</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:480px;margin:30px auto;padding:0 12px}
+select,input,button{width:100%;padding:8px;margin:6px 0 14px;box-sizing:border-box}
+.result{margin-top:20px;padding:14px;background:#eef;border-radius:6px}
+.err{color:#b00}
+</style></head><body>
+<h2>Alzheimer's Disease Detection from MRI</h2>
+<form method="post" enctype="multipart/form-data">
+  <label>MRI image</label>
+  <input type="file" name="image" accept="image/*" required>
+  <label>Algorithm</label>
+  <select name="algorithm">
+    {% for a in algorithms %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+  </select>
+  <button type="submit">Predict</button>
+</form>
+{% if error %}<p class="err">{{ error }}</p>{% endif %}
+{% if result %}<div class="result">
+  <b>Predicted class:</b> {{ result.label }}<br>
+  <b>Confidence:</b> {{ result.confidence }}<br>
+  <b>Algorithm:</b> {{ result.algo }}
+</div>{% endif %}
+<p style="font-size:12px;color:#666">Educational project. Not a medical diagnosis tool.</p>
+</body></html>
