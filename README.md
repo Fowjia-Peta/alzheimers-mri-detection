@@ -25,22 +25,27 @@ The Kaggle dataset has no train/test split, so OriginalDataset was split 80/20 i
 ## Run
 ```bash
 pip install -r requirements.txt
-python train.py --epochs 5      # trains the models and saves them in saved_models/
+python train.py --data dataset --epochs 10      # trains the models and saves them in saved_models/
 python app.py                    # open http://127.0.0.1:5000
 ```
 Training is faster on a GPU (Google Colab works).
 
 ## Results
 
-Trained on the Alzheimer's 4-class MRI dataset (Kaggle: pashacqu/alzheimers-dataset-4-class-of-images, OriginalDataset). The data was split 80/20 into train and validation sets. Each model was trained for 5 epochs on a Colab T4 GPU.
+Trained with python train.py --data dataset --epochs 10
+(seed 42, 6,400 images, 80/20 split: 5,119 train / 1,281 validation).
+The validation set is the test folder; there is no separate held-out test set.
+Class weights are the square root of balanced weights, to stop training
+collapsing on the rare ModerateDemented class (64 images).
 
-| Model | Validation Accuracy |
+| Model | Validation accuracy |
 |---|---|
-| Custom CNN | 95.00% |
-| MobileNetV2 | 87.82% |
-| VGG16 | 75.10% |
+| Custom CNN (10 epochs) | 96.96% |
+| VGG16 (10 head + 10 fine-tune epochs) | 91.80% |
+| MobileNetV2 (10 head + 10 fine-tune epochs) | 88.99% |
 
-Note: results are from a single 5-epoch run with a random 80/20 split, so numbers may vary slightly between runs.
+Numbers come from results.json and training_log.txt.
+Results can vary slightly between runs on GPU.
 
 ## Disclaimer
 Educational project only, not a medical diagnosis tool.
